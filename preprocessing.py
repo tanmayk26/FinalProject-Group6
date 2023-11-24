@@ -1,65 +1,41 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from bs4 import BeautifulSoup
+import nltk
 import re
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
-from tqdm.auto import tqdm
+from nltk.stem import WordNetLemmatizer
+import spacy
+nlp = spacy.load('en_core_web_sm')
+# Download necessary NLTK datasets
+#nltk.download('punkt')
+#nltk.download('stopwords')
+#nltk.download('wordnet')
 
-import nltk
+# Define the preprocessing function
+def preprocess_text(text):
+    text = text.lower()  # Lowercase text
+    text = re.sub(r'\W', ' ', text)  # Remove all non-word characters
+    text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with a single space
+    tokens = word_tokenize(text)  # Tokenize text
+    stop_words = set(stopwords.words('english'))
+    tokens = [word for word in tokens if word not in stop_words]  # Remove stopwords
+    stemmer = PorterStemmer()
+    lemmatizer = WordNetLemmatizer()
+    tokens = [stemmer.stem(word) for word in tokens]  # Stemming
+    tokens = [lemmatizer.lemmatize(word, pos='v') for word in tokens]  # Lemmatization
+    return ' '.join(tokens)
 
-# Load the dataset files
+# Load the datasets
 sarcasm_headlines_v1 = pd.read_json('Sarcasm_Headlines_Dataset.json', lines=True)
 sarcasm_headlines_v2 = pd.read_json('Sarcasm_Headlines_Dataset_v2.json', lines=True)
 
-print(sarcasm_headlines_v1.head())
-print(sarcasm_headlines_v2.head())
+# Apply the preprocessing function to the headline column of both datasets
+sarcasm_headlines_v1['headline_clean'] = sarcasm_headlines_v1['headline'].apply(preprocess_text)
+sarcasm_headlines_v2['headline_clean'] = sarcasm_headlines_v2['headline'].apply(preprocess_text)
 
-#Visualizing the data
-sarcasm_headlines_v1 = sarcasm_headlines_v1[['headline', 'is_sarcastic']]
-sarcasm_headlines_v2 = sarcasm_headlines_v2[['headline', 'is_sarcastic']]
-print(sarcasm_headlines_v1.head())
-print(sarcasm_headlines_v2.head())
+# Combine the datasets
+combined_sarcasm_headlines = pd.concat([sarcasm_headlines_v1, sarcasm_headlines_v2], ignore_index=True)
 
-#visualizing the distribution of sarcastic and non-sarcastic headlines
-print(sarcasm_headlines_v1['is_sarcastic'].value_counts())
-print(sarcasm_headlines_v2['is_sarcastic'].value_counts())
-
-# Combining the datasets for visualization
-combined_data = pd.concat([sarcasm_headlines_v1, sarcasm_headlines_v2])
-
-# Plot the distribution of sarcastic vs non-sarcastic headlines
-plt.figure(figsize=(8, 5))
-sns.countplot(x='is_sarcastic', data=combined_data)
-plt.title('Distribution of Sarcastic vs Non-Sarcastic Headlines')
-plt.xlabel('Is Sarcastic')
-plt.ylabel('Count')
-plt.xticks([0, 1], ['Non-Sarcastic', 'Sarcastic'])
-plt.show()
-
-
-stop_words = set(stopwords.words('english'))
-stemmer = PorterStemmer()
-tqdm.pandas()
-# Function to clean the headlines
-def clean_headline(headline):
-    # Remove special characters and numbers
-    headline = re.sub(r'[^A-Za-z ]+', '', headline)
-    # Tokenize
-    words = word_tokenize(headline)
-    # Lowercase and remove stop words
-    words = [word.lower() for word in words if word.lower() not in stop_words]
-    # Stemming
-    words = [stemmer.stem(word) for word in words]
-    return ' '.join(words)
-
-
-# Apply the cleaning function to the headlines
-sarcasm_headlines_v1['headline_clean'] = sarcasm_headlines_v1['headline'].progress_apply(clean_headline)
-sarcasm_headlines_v2['headline_clean'] = sarcasm_headlines_v2['headline'].progress_apply(clean_headline)
-
-# Display the cleaned headlines
-print(sarcasm_headlines_v1[['headline', 'headline_clean']].head())
-print(sarcasm_headlines_v2[['headline', 'headline_clean']].head())
+# Save the combined preprocessed dataset to a new file
+combined_sarcasm_headlines.to_csv('combined_preprocessed_headlines.csv', index=False)
