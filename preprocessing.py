@@ -1,41 +1,71 @@
 import pandas as pd
-import nltk
-import re
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
-from nltk.stem import WordNetLemmatizer
+import matplotlib.pyplot as plt
+import seaborn as sns
 import spacy
+import nltk
+#from tqdm import tqdm
+
+# Load Spacy's English language model
 nlp = spacy.load('en_core_web_sm')
-# Download necessary NLTK datasets
-#nltk.download('punkt')
-#nltk.download('stopwords')
-#nltk.download('wordnet')
 
-# Define the preprocessing function
+# Load the sarcasm datasets from the provided JSON files
+sarcasm_df = pd.read_json('Sarcasm_Headlines_Dataset.json', lines=True)
+sarcasm_df_v2 = pd.read_json('Sarcasm_Headlines_Dataset_v2.json', lines=True)
+
+# Show the head of the datasets to inspect the data
+print(sarcasm_df.head())
+print(sarcasm_df_v2.head())
+
+# Check for missing values
+print(sarcasm_df.isnull().sum())
+print(sarcasm_df_v2.isnull().sum())
+
+# Check for duplicates
+print(sarcasm_df.duplicated().sum())
+print(sarcasm_df_v2.duplicated().sum())
+
+# Remove duplicates
+sarcasm_df = sarcasm_df.drop_duplicates()
+sarcasm_df_v2 = sarcasm_df_v2.drop_duplicates()
+
+# Show the number of rows remaining after duplicate removal
+print('Number of rows in sarcasm_df:', sarcasm_df.shape[0])
+print('Number of rows in sarcasm_df_v2:', sarcasm_df_v2.shape[0])
+
+# Define a text preprocessing function
 def preprocess_text(text):
-    text = text.lower()  # Lowercase text
-    text = re.sub(r'\W', ' ', text)  # Remove all non-word characters
-    text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with a single space
-    tokens = word_tokenize(text)  # Tokenize text
-    stop_words = set(stopwords.words('english'))
-    tokens = [word for word in tokens if word not in stop_words]  # Remove stopwords
-    stemmer = PorterStemmer()
-    lemmatizer = WordNetLemmatizer()
-    tokens = [stemmer.stem(word) for word in tokens]  # Stemming
-    tokens = [lemmatizer.lemmatize(word, pos='v') for word in tokens]  # Lemmatization
-    return ' '.join(tokens)
+    # Process the text using Spacy
+    doc = nlp(text.lower())
+    # Lemmatize and retain words (excluding spaces)
+    lemmatized = [token.lemma_ for token in doc if not token.is_space]
+    return ' '.join(lemmatized)
 
-# Load the datasets
-sarcasm_headlines_v1 = pd.read_json('Sarcasm_Headlines_Dataset.json', lines=True)
-sarcasm_headlines_v2 = pd.read_json('Sarcasm_Headlines_Dataset_v2.json', lines=True)
+# Apply the preprocessing function to the headline column
+sarcasm_df['clean_headline'] = sarcasm_df['headline'].apply(preprocess_text)
+sarcasm_df_v2['clean_headline'] = sarcasm_df_v2['headline'].apply(preprocess_text)
 
-# Apply the preprocessing function to the headline column of both datasets
-sarcasm_headlines_v1['headline_clean'] = sarcasm_headlines_v1['headline'].apply(preprocess_text)
-sarcasm_headlines_v2['headline_clean'] = sarcasm_headlines_v2['headline'].apply(preprocess_text)
+# Extract additional features
+sarcasm_df['headline_length'] = sarcasm_df['headline'].apply(len)
+sarcasm_df['word_count'] = sarcasm_df['headline'].apply(lambda x: len(x.split()))
+sarcasm_df_v2['headline_length'] = sarcasm_df_v2['headline'].apply(len)
+sarcasm_df_v2['word_count'] = sarcasm_df_v2['headline'].apply(lambda x: len(x.split()))
 
-# Combine the datasets
-combined_sarcasm_headlines = pd.concat([sarcasm_headlines_v1, sarcasm_headlines_v2], ignore_index=True)
+# Show the head of the updated datasets
+print(sarcasm_df.head())
+print(sarcasm_df_v2.head())
 
-# Save the combined preprocessed dataset to a new file
-combined_sarcasm_headlines.to_csv('combined_preprocessed_headlines.csv', index=False)
+# Set the aesthetic style of the plots
+sns.set_style('whitegrid')
+
+# Plot the distribution of sarcastic vs non-sarcastic headlines
+plt.figure(figsize=(14, 7))
+plt.subplot(1, 2, 1)
+sns.countplot(x='is_sarcastic', data=sarcasm_df)
+plt.title('Distribution of Sarcastic vs Non-Sarcastic Headlines (Dataset 1)')
+
+plt.subplot(1, 2, 2)
+sns.countplot(x='is_sarcastic', data=sarcasm_df_v2)
+plt.title('Distribution of Sarcastic vs Non-Sarcastic Headlines (Dataset 2)')
+
+plt.tight_layout()
+plt.show()
