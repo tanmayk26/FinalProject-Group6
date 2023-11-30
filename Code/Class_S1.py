@@ -32,7 +32,7 @@ def load_and_preprocess(data_paths):
     data['headline'] = data['headline'].apply(lambda x: ' '.join([word for word in x.split() if word not in stopwords.words('english')]))
 
     return data
-
 data_paths = ['Sarcasm_Headlines_Dataset.json', 'Sarcasm_Headlines_Dataset_v2.json']
 data = load_and_preprocess(data_paths)
+#Tokenization and Dataset Creation
 
