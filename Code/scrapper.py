@@ -59,8 +59,15 @@ def extract_text_from_url(url):
 code_directory = os.getcwd()
 data_directory = os.path.join(os.path.split(code_directory)[0], 'Code')
 download_available_data(data_directory)
-final_data = pd.read_json(os.path.join(data_directory, r'Sarcasm_Headlines_Dataset.json'), lines=True)
-sarcastic_data = final_data.iloc[final_data.filter(final_data.is_sarcastic == 1).index]
+df1 = pd.read_json(os.path.join(data_directory, r'Sarcasm_Headlines_Dataset.json'), lines=True)
+df2 = pd.read_json(os.path.join(data_directory, r'Sarcasm_Headlines_Dataset_v2.json'), lines=True)
+df2 = df2[['article_link', 'headline', 'is_sarcastic']]
+final_data = pd.concat([df1, df2], ignore_index=True)
+sarcastic_data = final_data.loc[final_data['is_sarcastic'] == 1]
+sarcastic_data.reset_index(drop=True, inplace=True)
+print(sarcastic_data.head())
+print(sarcastic_data.columns)
+print(sarcastic_data.shape)
 
 sarcastic_data["body"] = [""] * len(sarcastic_data)
 print("\nScraping TheOnion articles...")
@@ -70,5 +77,5 @@ with tqdm(total=len(sarcastic_data)) as progress_bar:
         sarcastic_data.loc[i, "body"] = body
         progress_bar.update()
 
-output_path = os.path.join(data_directory, "sarcastic_text.json")
+output_path = os.path.join(data_directory, "sarcastic_news_text.json")
 sarcastic_data.to_json(output_path)
