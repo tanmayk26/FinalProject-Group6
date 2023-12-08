@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -12,12 +11,10 @@ from lime.lime_text import LimeTextExplainer
 from sklearn.pipeline import make_pipeline
 import nltk
 from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
 import pickle
-
+#Analysis Text Classification
 nltk.download('stopwords')
 nltk.download('wordnet')
-
 
 # Function to process text data
 def process_text(data):
