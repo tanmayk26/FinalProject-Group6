@@ -41,7 +41,6 @@ def evaluate_model(clf, X_train, y_train, X_test, y_test, name):
     filename = f'finalized_{name}_model.sav'
     pickle.dump(clf, open(filename, 'wb'))
 
-
 # Paths to the dataset files
 train_file_path = 'Sarcasm_Headlines_Dataset.json'
 test_file_path = 'Sarcasm_Headlines_Dataset_v2.json'
@@ -71,7 +70,7 @@ clf_nb.fit(X_train, y_train)
 evaluate_model(clf_nb, X_train, y_train, X_test, y_test, 'NB')
 
 # LIME explanation
-num_examples = 5  # Number of examples to explain
+num_examples = 3
 
 for _ in range(num_examples):
     idx = np.random.randint(0, len(df_test))
@@ -82,13 +81,11 @@ for _ in range(num_examples):
     class_names = ["Non Sarcastic", "Sarcastic"]
     explainer_lr = LimeTextExplainer(class_names=class_names)
     exp_lr = explainer_lr.explain_instance(headline, c_lr.predict_proba, num_features=10)
-
     print(f"Logistic Regression - Example {idx}")
     print("Headline:", headline)
     print("Probability (Non sarcastic) =", c_lr.predict_proba([headline])[0, 1])
     print("Probability (sarcastic) =", c_lr.predict_proba([headline])[0, 0])
     print("True Class:", class_names[df_test.iloc[idx]["is_sarcastic"]])
-
     exp_lr.as_pyplot_figure()
     plt.title(f"LIME Explanation for Example {idx} - Logistic Regression")
     plt.show()
