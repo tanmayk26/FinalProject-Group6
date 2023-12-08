@@ -12,7 +12,9 @@ from sklearn.pipeline import make_pipeline
 import nltk
 from nltk.corpus import stopwords
 import pickle
-#Analysis Text Classification
+
+#Analysis Text Classification,model training and evaluation, and model explanation using LIME
+
 nltk.download('stopwords')
 nltk.download('wordnet')
 
