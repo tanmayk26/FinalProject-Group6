@@ -107,3 +107,48 @@ class BertRNN(nn.Module):
         x = self.dropout(pooled_output)
         logits = self.fc(x)
         return logits
+
+#--------------TRAINNING------------
+
+def train(model, dataloader, optimizer, criterion, device):
+    model.train()
+    total_loss, total_correct = 0, 0
+
+    for batch in tqdm(dataloader, desc="Training"):
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        labels = batch['labels'].to(device)
+
+        optimizer.zero_grad()
+        outputs = model(input_ids, attention_mask)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        total_correct += (outputs.argmax(dim=1) == labels).sum().item()
+
+    avg_loss = total_loss / len(dataloader)
+    accuracy = total_correct / len(dataloader.dataset)
+    return avg_loss, accuracy
+
+def evaluate(model, dataloader, criterion, device):
+    model.eval()
+    total_loss, total_correct = 0, 0
+
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Evaluating"):
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+
+            outputs = model(input_ids, attention_mask)
+            loss = criterion(outputs, labels)
+
+            total_loss += loss.item()
+            total_correct += (outputs.argmax(dim=1) == labels).sum().item()
+
+    avg_loss = total_loss / len(dataloader)
+    accuracy = total_correct / len(dataloader.dataset)
+    return avg_loss, accuracy
+
