@@ -152,3 +152,42 @@ def evaluate(model, dataloader, criterion, device):
     accuracy = total_correct / len(dataloader.dataset)
     return avg_loss, accuracy
 
+
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load Data
+    train_dataset = SarcasmDataset('Sarcasm_Headlines_Dataset.json')
+    val_dataset = SarcasmDataset('Sarcasm_Headlines_Dataset.json')
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+    model = BertRNN()  # BertCNN, BertMLP, BertLSTM, BertRNN
+    model.to(device)
+
+    epochs = 3
+    best_accuracy = 0
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = AdamW(model.parameters(), lr=5e-5)
+    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0,
+                                                num_training_steps=len(train_loader) * epochs)
+
+    for epoch in range(epochs):
+        print(f"Epoch {epoch + 1}/{epochs}")
+        train_loss, train_accuracy = train(model, train_loader, optimizer, criterion, device)
+        val_loss, val_accuracy = evaluate(model, val_loader, criterion, device)
+        scheduler.step()
+
+        print(f"Train Loss: {train_loss:.3f}, Train Acc: {train_accuracy:.3f}")
+        print(f"Val Loss: {val_loss:.3f}, Val Acc: {val_accuracy:.3f}")
+
+        if val_accuracy > best_accuracy:
+            best_accuracy = val_accuracy
+            torch.save(model.state_dict(), 'best_model.pt')
+
+    print("Training complete!")
+
+
+if __name__ == "__main__":
+    main()
