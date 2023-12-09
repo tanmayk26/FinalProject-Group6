@@ -1,109 +1,51 @@
-# # Import necessary libraries
-# import pandas as pd
-# import numpy as np
-# import spacy
-# from spacy.lang.en.stop_words import STOP_WORDS
-# from gensim.models import KeyedVectors
-# from sklearn.model_selection import train_test_split
-# from sklearn.linear_model import LogisticRegression
-# from sklearn.naive_bayes import MultinomialNB
-# from sklearn.neural_network import MLPClassifier
-# from sklearn.pipeline import make_pipeline
-# from sklearn.preprocessing import StandardScaler
-# from sklearn.metrics import classification_report, confusion_matrix
-# from textblob import TextBlob
-#
-# # Load Spacy's English language model
-# nlp = spacy.load('en_core_web_sm')
-#
-# # Preprocess and clean text
-# def preprocess_text(text):
-#     doc = nlp(text.lower())
-#     lemmatized = [token.lemma_ for token in doc if not token.is_punct and not token.is_space and not token.is_stop]
-#     return ' '.join(lemmatized)
-#
-# # Load the sarcasm datasets
-# sarcasm_df = pd.read_json('Sarcasm_Headlines_Dataset.json', lines=True)
-#
-# # Apply the preprocess_text function to clean the headlines
-# sarcasm_df['clean_headline'] = sarcasm_df['headline'].apply(preprocess_text)
-#
-# # Sentiment Analysis
-# sarcasm_df['sentiment'] = sarcasm_df['headline'].apply(lambda x: TextBlob(x).sentiment.polarity)
-#
-# # Feature Engineering
-# sarcasm_df['headline_length'] = sarcasm_df['headline'].apply(len)
-# sarcasm_df['word_count'] = sarcasm_df['headline'].apply(lambda x: len(x.split()))
-# sarcasm_df['exclamation_mark'] = sarcasm_df['headline'].apply(lambda x: '!' in x)
-# sarcasm_df['question_mark'] = sarcasm_df['headline'].apply(lambda x: '?' in x)
-#
-# # Load pre-trained GloVe word embeddings
-# glove_vectors = KeyedVectors.load_word2vec_format('glove.6B.100d.word2vec.txt', binary=False)
-#
-# # Function to convert headlines into averaged word vector representation
-# def headline_to_avg_vector(headline):
-#     words = headline.split()
-#     word_vectors = [glove_vectors[word] for word in words if word in glove_vectors]
-#     if len(word_vectors) == 0:
-#         return np.zeros(glove_vectors.vector_size)
-#     else:
-#         return np.mean(word_vectors, axis=0)
-#
-# # Apply the function to the cleaned headlines
-# sarcasm_df['headline_vector'] = sarcasm_df['clean_headline'].apply(headline_to_avg_vector)
-#
-# # Split the data into training and testing sets
-# X = np.stack(sarcasm_df['headline_vector'].values)
-# y = sarcasm_df['is_sarcastic'].values
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-#
-# # Define a list of classifiers to experiment with
-# classifiers = [
-#     LogisticRegression(),
-#     MultinomialNB(),
-#     MLPClassifier()
-# ]
-#
-# # Evaluate each classifier
-# for clf in classifiers:
-#     pipeline = make_pipeline(StandardScaler(), clf)
-#     pipeline.fit(X_train, y_train)
-#     y_pred = pipeline.predict(X_test)
-#     print(f'Classifier: {clf.__class__.__name__}')
-#     print(classification_report(y_test, y_pred))
-#     print(confusion_matrix(y_test, y_pred))
-#     print('---')
-#
-# #further work on advance models(bert)
-
 import pandas as pd
 import numpy as np
+import string
 import matplotlib.pyplot as plt
 import seaborn as sns
 from nltk import word_tokenize, pos_tag, ngrams
 from nltk.corpus import stopwords
 import re
 from collections import Counter
+
+from pandas.tests.tools.test_to_datetime import epochs
 from textblob import TextBlob
 import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import Word2Vec
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
+from wordcloud import WordCloud
 
 
 from tqdm.auto import tqdm
 # Download necessary NLTK resources
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('averaged_perceptron_tagger')
+# nltk.download('stopwords')
+nltk.download('wordnet')
 stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+def clean_text(text):
+    text = text.lower()  # Lowercasing
+    text = re.sub(r'http\S+', '', text)  # Remove URLs
+    text = re.sub(r'\d+', '', text)  # Remove digits
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    return text
 
+def get_wordnet_pos(word):
+    """Map POS tag to first character lemmatize() accepts"""
+    tag = pos_tag([word])[0][1][0].upper()
+    tag_dict = {"J": wordnet.ADJ, "N": wordnet.NOUN, "V": wordnet.VERB, "R": wordnet.ADV}
+    return tag_dict.get(tag, wordnet.NOUN)
+
+def lemmatize_text(text):
+    return ' '.join([lemmatizer.lemmatize(w, get_wordnet_pos(w)) for w in nltk.word_tokenize(text)])
 # Load the datasets
 data_v1 = pd.read_json('Sarcasm_Headlines_Dataset.json', lines=True)
 data_v2 = pd.read_json('Sarcasm_Headlines_Dataset_v2.json', lines=True)
-
-
 
 # Display the head and description of both datasets
 print('First Dataset Head:')
@@ -150,6 +92,23 @@ print(balance_merged)
 # Save the merged dataset
 merged_data.to_csv('cleaned_merged_sarcasm_dataset.csv', index=False)
 print('\nMerged dataset saved as cleaned_merged_sarcasm_dataset.csv')
+# Apply the cleaning and lemmatization functions
+merged_data['cleaned_headline'] = merged_data['headline'].apply(clean_text)
+merged_data['lemmatized_headline'] = merged_data['cleaned_headline'].apply(lemmatize_text)
+
+# Feature Engineering
+def word_count(text):
+    return len(text.split())
+
+def char_count(text):
+    return len(text)
+
+def punctuation_count(text):
+    return len([char for char in text if char in string.punctuation])
+
+merged_data['word_count'] = merged_data['headline'].apply(word_count)
+merged_data['char_count'] = merged_data['headline'].apply(char_count)
+merged_data['punctuation_count'] = merged_data['headline'].apply(punctuation_count)
 
 # Text Length Analysis
 merged_data['headline_length'] = merged_data['headline'].apply(len)
@@ -283,17 +242,36 @@ def plot_top_ngrams(filtered_tokens_series, title, n=2):
 plot_top_ngrams(merged_data[merged_data['is_sarcastic'] == 1]['filtered_tokens'], 'Top Bigrams in Sarcastic Headlines', n=2)
 plot_top_ngrams(merged_data[merged_data['is_sarcastic'] == 0]['filtered_tokens'], 'Top Bigrams in Non-Sarcastic Headlines', n=2)
 
+# Combine all headlines for the word cloud
+all_headlines = ' '.join(merged_data['lemmatized_headline'])
+
+# Generate a word cloud
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(all_headlines)
+
+# Display the word cloud using matplotlib
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.show()
+
 # Save the enhanced dataset with new features
 merged_data.to_csv('enhanced_sarcasm_dataset.csv', index=False)
 print('\nEnhanced dataset saved as enhanced_sarcasm_dataset.csv')
 
-# TF-IDF Vectorization
+# ##Before adding Preprocessing steps
+# # TF-IDF Vectorization
+# tfidf_vectorizer = TfidfVectorizer(max_features=5000)
+# X_tfidf = tfidf_vectorizer.fit_transform(merged_data['headline']).toarray()
+# # Word2Vec Model Training
+# word2vec_model = Word2Vec(merged_data['filtered_tokens'], vector_size=100, window=5, min_count=2, workers=4)
+
+
+##After adding preprocessing steps:
+# TF-IDF Vectorization using lemmatized text
 tfidf_vectorizer = TfidfVectorizer(max_features=5000)
-X_tfidf = tfidf_vectorizer.fit_transform(merged_data['headline']).toarray()
-
-# Word2Vec Model Training
-word2vec_model = Word2Vec(merged_data['filtered_tokens'], vector_size=100, window=5, min_count=2, workers=4)
-
+X_tfidf = tfidf_vectorizer.fit_transform(merged_data['lemmatized_headline']).toarray()
+# Word2Vec Model Training using tokenized lemmatized text
+word2vec_model = Word2Vec(merged_data['lemmatized_headline'].apply(nltk.word_tokenize), vector_size=100, window=5, min_count=2, workers=4)
 
 # Split the data for the machine learning model
 X_train, X_test, y_train, y_test = train_test_split(
@@ -302,6 +280,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.2,
     random_state=42
 )
+
 ##Baseline Models
 #1LogisticRegression
 from sklearn.linear_model import LogisticRegression
@@ -365,4 +344,380 @@ accuracy_gb = accuracy_score(y_test, y_pred_gb)
 print(f"Gradient Boosting Accuracy: {accuracy_gb}")
 
 ##Deep Learning Approaches
-#1LSTM (Long Short-Term Memory networks):
+# #1LSTM (Long Short-Term Memory networks):
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from keras.models import Sequential
+from keras.layers import Embedding, LSTM, Dense, SpatialDropout1D, Bidirectional, Dropout
+from keras.callbacks import EarlyStopping
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+import numpy as np
+
+# Hyperparameters
+vocab_size = 10000
+max_length = 120
+embedding_dim = 64
+oov_tok = '<OOV>'
+
+# Tokenizing for Keras models
+tokenizer_keras = Tokenizer(num_words=vocab_size, oov_token=oov_tok)
+tokenizer_keras.fit_on_texts(merged_data['lemmatized_headline'])
+sequences = tokenizer_keras.texts_to_sequences(merged_data['lemmatized_headline'])
+padded = pad_sequences(sequences, maxlen=max_length, padding='post', truncating='post')
+
+# Splitting the data
+X_train, X_test, y_train, y_test = train_test_split(padded, merged_data['is_sarcastic'], test_size=0.2, random_state=42)
+
+# LSTM Model with Bidirectional layer and Spatial Dropout
+model_lstm = Sequential([
+    Embedding(vocab_size, embedding_dim, input_length=max_length),
+    SpatialDropout1D(0.3),
+    Bidirectional(LSTM(64, dropout=0.2, recurrent_dropout=0.2)),
+    Dense(64, activation='relu'),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model_lstm.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+# Model Summary
+model_lstm.summary()
+
+# Early Stopping to prevent overfitting
+early_stopping = EarlyStopping(monitor='val_loss', patience=3, verbose=1)
+
+# Train the model
+history = model_lstm.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test), callbacks=[early_stopping])
+
+# Predictions
+y_pred = model_lstm.predict(X_test)
+y_pred_classes = np.where(y_pred > 0.5, 1, 0)
+
+# Evaluation Metrics
+print("Classification Report:")
+print(classification_report(y_test, y_pred_classes))
+
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred_classes))
+
+# Plotting accuracy and loss graphs
+import matplotlib.pyplot as plt
+
+def plot_graphs(history, metric):
+    plt.plot(history.history[metric])
+    plt.plot(history.history['val_'+metric])
+    plt.xlabel("Epochs")
+    plt.ylabel(metric)
+    plt.legend([metric, 'val_'+metric])
+    plt.show()
+
+plot_graphs(history, 'accuracy')
+plot_graphs(history, 'loss')
+
+
+
+from keras.layers import Conv1D, GlobalMaxPooling1D, Dropout
+
+# CNN Model
+model_cnn = Sequential([
+    Embedding(vocab_size, 32, input_length=max_length),
+    Conv1D(64, 5, activation='relu'),
+    GlobalMaxPooling1D(),
+    Dense(64, activation='relu'),
+    Dropout(0.5),
+    Dense(1, activation='sigmoid')
+])
+
+# Compile the model
+model_cnn.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+# Model summary
+model_cnn.summary()
+
+# Callback for early stopping
+early_stopping = EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
+
+# Train the model
+history_cnn = model_cnn.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test), callbacks=[early_stopping])
+
+# Evaluate the model
+eval_result = model_cnn.evaluate(X_test, y_test)
+print(f'\nTest Loss: {eval_result[0]} / Test Accuracy: {eval_result[1]}')
+
+# Generate classification report and confusion matrix
+y_pred_cnn = model_cnn.predict(X_test).round()
+print(classification_report(y_test, y_pred_cnn))
+print(confusion_matrix(y_test, y_pred_cnn))
+
+
+
+# Tranformer
+import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import BertTokenizer, BertForSequenceClassification, AdamW, get_linear_schedule_with_warmup
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+# Initialize BertTokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+# Split data into training and validation sets
+train_texts, val_texts, train_labels, val_labels = train_test_split(
+    merged_data['lemmatized_headline'].tolist(),
+    merged_data['is_sarcastic'].tolist(),
+    test_size=0.1,  # You can adjust the test size
+    random_state=42
+)
+
+
+
+#Creating a Custom Dataset Class:
+class SarcasmDataset(Dataset):
+    def __init__(self, headlines, labels, tokenizer, max_token_len=128):
+        self.headlines = headlines
+        self.labels = labels
+        self.tokenizer = tokenizer
+        self.max_token_len = max_token_len
+
+    def __len__(self):
+        return len(self.headlines)
+
+    def __getitem__(self, index):
+        headline = self.headlines[index]
+        label = self.labels[index]
+
+        encoding = self.tokenizer.encode_plus(
+            headline,
+            add_special_tokens=True,
+            max_length=self.max_token_len,
+            return_token_type_ids=False,
+            padding="max_length",
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt',
+        )
+
+        return {
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': torch.tensor(self.labels[index], dtype=torch.long)  # Add this line
+        }
+
+# Create instances of SarcasmDataset for training and validation
+train_dataset = SarcasmDataset(train_texts, train_labels, tokenizer, max_token_len=128)
+val_dataset = SarcasmDataset(val_texts, val_labels, tokenizer, max_token_len=128)
+
+# Creating DataLoaders
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)  # Set shuffle to False for validation set
+
+
+#BERT model architecture for classification.
+from transformers import BertForSequenceClassification, AdamW, BertConfig
+
+# Load BertForSequenceClassification
+model = BertForSequenceClassification.from_pretrained(
+    "bert-base-uncased",
+    num_labels=2,  # Binary classification
+    output_attentions=False,
+    output_hidden_states=False,
+)
+
+# Set the device and move the model to it
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model.to(device)
+
+# Optimizer and Scheduler
+optimizer = AdamW(model.parameters(), lr=2e-5, eps=1e-8)
+
+# Number of training epochs
+epochs = 5  # Adjust the number of epochs based on your requirements
+
+# Calculate the total number of training steps
+total_steps = len(train_loader) * epochs
+
+# Create the learning rate scheduler
+scheduler = get_linear_schedule_with_warmup(
+    optimizer,
+    num_warmup_steps=0,
+    num_training_steps=total_steps
+)
+
+# Training loop
+for epoch in range(epochs):
+    total_train_loss = 0
+    model.train()
+
+    for step, batch in enumerate(train_loader):
+        b_input_ids = batch['input_ids'].to(device)
+        b_input_mask = batch['attention_mask'].to(device)
+        b_labels = batch['label'].to(device)
+
+        model.zero_grad()
+
+        outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_input_mask, labels=b_labels)
+        loss = outputs.loss
+        logits = outputs.logits
+
+        total_train_loss += loss.item()
+        loss.backward()
+        optimizer.step()
+        scheduler.step()
+
+    avg_train_loss = total_train_loss / len(train_loader)
+    print(f"Epoch {epoch + 1} - Average training loss: {avg_train_loss}")
+
+# Assuming 'val_loader' is your DataLoader for the validation set
+model.eval()  # Set the model to evaluation mode
+
+# Initialize lists to store predictions and true labels
+all_predictions = []
+all_true_labels = []
+
+# Evaluation loop
+with torch.no_grad():
+    for batch in val_loader:
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        labels = batch['label'].to(device)
+
+        outputs = model(input_ids, token_type_ids=None, attention_mask=attention_mask)
+        logits = outputs.logits
+
+        # Move logits and labels to CPU
+        logits = logits.detach().cpu().numpy()
+        label_ids = labels.to('cpu').numpy()
+
+        # Store predictions and true labels
+        all_predictions.extend(np.argmax(logits, axis=1).flatten())
+        all_true_labels.extend(label_ids.flatten())
+
+# Calculate evaluation metrics
+accuracy = accuracy_score(all_true_labels, all_predictions)
+precision, recall, f1, _ = precision_recall_fscore_support(all_true_labels, all_predictions, average='binary')
+
+print(f"Accuracy: {accuracy}")
+print(f"Precision: {precision}")
+print(f"Recall: {recall}")
+print(f"F1 Score: {f1}")
+
+from transformers import BertModel
+import torch.nn as nn
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
+
+# Assuming your dataloaders (train_loader and val_loader) are already defined and loaded with the dataset
+
+# BERT + LSTM Model
+class BertLSTM(nn.Module):
+    def __init__(self):
+        super(BertLSTM, self).__init__()
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        self.lstm = nn.LSTM(input_size=768, hidden_size=256, num_layers=2, batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(256 * 2, 2)
+
+    def forward(self, input_ids, attention_mask):
+        with torch.no_grad():
+            sequence_output, _ = self.bert(input_ids=input_ids, attention_mask=attention_mask, return_dict=False)
+        lstm_out, _ = self.lstm(sequence_output)
+        out = self.fc(lstm_out[:, -1, :])
+        return out
+
+
+# BERT + CNN Model
+class BertCNN(nn.Module):
+    def __init__(self):
+        super(BertCNN, self).__init__()
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        self.conv = nn.Conv1d(in_channels=768, out_channels=256, kernel_size=2)
+        self.relu = nn.ReLU()
+        self.fc = nn.Linear(256, 2)
+
+    def forward(self, input_ids, attention_mask):
+        with torch.no_grad():
+            sequence_output, _ = self.bert(input_ids=input_ids, attention_mask=attention_mask, return_dict=False)
+        conv_input = sequence_output.permute(0, 2, 1)
+        conv_out = self.conv(conv_input)
+        conv_out = self.relu(conv_out)
+        pooled = torch.max(conv_out, 2).values
+        out = self.fc(pooled)
+        return out
+
+
+# Device configuration
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# Initialize models and move to device
+bert_lstm_model = BertLSTM().to(device)
+bert_cnn_model = BertCNN().to(device)
+
+# Criterion and Optimizer
+criterion = nn.CrossEntropyLoss()
+optimizer_lstm = optim.Adam(bert_lstm_model.parameters(), lr=2e-5)
+optimizer_cnn = optim.Adam(bert_cnn_model.parameters(), lr=2e-5)
+
+
+# Training function
+def train_model(model, train_loader, optimizer, criterion, epochs, device):
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        for batch in train_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+
+            optimizer.zero_grad()
+            outputs = model(input_ids, attention_mask)
+            loss = criterion(outputs, labels)
+            total_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+
+        avg_loss = total_loss / len(train_loader)
+        print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}')
+
+
+# Evaluation function
+def evaluate_model(model, val_loader, device):
+    model.eval()
+    all_predictions = []
+    all_true_labels = []
+
+    with torch.no_grad():
+        for batch in val_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+            outputs = model(input_ids, attention_mask)
+            _, predicted = torch.max(outputs, 1)
+
+            all_predictions.extend(predicted.tolist())
+            all_true_labels.extend(labels.tolist())
+
+    accuracy = accuracy_score(all_true_labels, all_predictions)
+    precision, recall, f1, _ = precision_recall_fscore_support(all_true_labels, all_predictions, average='binary')
+    return accuracy, precision, recall, f1
+
+
+# Training BERT + LSTM
+print("Training BERT + LSTM...")
+train_model(bert_lstm_model, train_loader, optimizer_lstm, criterion, epochs=5, device=device)
+
+# Training BERT + CNN
+print("Training BERT + CNN...")
+train_model(bert_cnn_model, train_loader, optimizer_cnn, criterion, epochs=5, device=device)
+
+# Evaluating BERT + LSTM
+accuracy_lstm, precision_lstm, recall_lstm, f1_lstm = evaluate_model(bert_lstm_model, val_loader, device)
+print(
+    f"BERT + LSTM - Accuracy: {accuracy_lstm}, Precision: {precision_lstm}, Recall: {recall_lstm}, F1 Score: {f1_lstm}")
+
+# Evaluating BERT + CNN
+accuracy_cnn, precision_cnn, recall_cnn, f1_cnn = evaluate_model(bert_cnn_model, val_loader, device)
+print(f"BERT + CNN - Accuracy: {accuracy_cnn}, Precision: {precision_cnn}, Recall: {recall_cnn}, F1 Score: {f1_cnn}")
