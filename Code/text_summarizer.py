@@ -1,3 +1,8 @@
+# This code implements a headline generation model using the T5 transformer architecture and
+# evaluates its performance on a sarcastic news dataset. It includes data processing functions,
+# tokenization, optional model training, and the generation of predictions for test data.
+# The results, including ROUGE scores and random predictions, are visualized and saved to a CSV file.
+
 import os
 import random
 import numpy as np
@@ -12,7 +17,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, DataCollatorForSe
 from accelerate import Accelerator
 import evaluate
 from tqdm import tqdm
-2
+
 # Constants
 data_splits = {'train': 0.8, 'val': 0.1, 'test': 0.1}
 input_var = 'body'
