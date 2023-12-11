@@ -8,8 +8,6 @@ from socket import gaierror
 import gdown
 
 # need to install lxml
-
-
 def download_available_data(target_dir):
     current_directory = os.getcwd()
     if not os.path.exists(target_dir):
