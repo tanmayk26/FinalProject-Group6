@@ -7,7 +7,6 @@ from nltk import word_tokenize, pos_tag, ngrams
 from nltk.corpus import stopwords
 import re
 from collections import Counter
-
 from pandas.tests.tools.test_to_datetime import epochs
 from textblob import TextBlob
 import nltk
@@ -18,9 +17,11 @@ from sklearn.metrics import accuracy_score
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 from wordcloud import WordCloud
-nltk.download('wordnet')
+from tqdm.auto import tqdm
+#nltk.download('wordnet')
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
+
 def clean_text(text):
     text = text.lower()  # Lowercasing
     text = re.sub(r'http\S+', '', text)  # Remove URLs
@@ -36,21 +37,19 @@ def get_wordnet_pos(word):
 
 def lemmatize_text(text):
     return ' '.join([lemmatizer.lemmatize(w, get_wordnet_pos(w)) for w in nltk.word_tokenize(text)])
+
 # Load the datasets
 data_v1 = pd.read_json('Sarcasm_Headlines_Dataset.json', lines=True)
 data_v2 = pd.read_json('Sarcasm_Headlines_Dataset_v2.json', lines=True)
-
 # Display the head and description of both datasets
 print('First Dataset Head:')
 print(data_v1.head())
 print('\nFirst Dataset Description:')
 print(data_v1.describe(include='all'))
-
 print('\nSecond Dataset Head:')
 print(data_v2.head())
 print('\nSecond Dataset Description:')
 print(data_v2.describe(include='all'))
-
 # Check the balance of sarcastic and non-sarcastic labels in each dataset
 balance_v1 = data_v1['is_sarcastic'].value_counts(normalize=True)
 balance_v2 = data_v2['is_sarcastic'].value_counts(normalize=True)
@@ -58,7 +57,6 @@ print('Balance of labels in first dataset (v1):')
 print(balance_v1)
 print('\nBalance of labels in second dataset (v2):')
 print(balance_v2)
-
 # Check for unique and common headlines
 unique_headlines_v1 = data_v1['headline'].nunique()
 unique_headlines_v2 = data_v2['headline'].nunique()
@@ -72,16 +70,13 @@ data_v1.dropna(inplace=True)
 data_v2.dropna(inplace=True)
 common_headlines = set(data_v1['headline'])
 data_v2_unique = data_v2[~data_v2['headline'].isin(common_headlines)]
-
 # Merge the datasets
 merged_data = pd.concat([data_v1, data_v2_unique]).reset_index(drop=True)
-
 # Check the balance of the merged dataset
 balance_merged = merged_data['is_sarcastic'].value_counts(normalize=True)
 print('\nNumber of headlines after merging and removing duplicates:', merged_data.shape[0])
 print('Balance of labels in the merged dataset:')
 print(balance_merged)
-
 # Save the merged dataset
 merged_data.to_csv('cleaned_merged_sarcasm_dataset.csv', index=False)
 print('\nMerged dataset saved as cleaned_merged_sarcasm_dataset.csv')
@@ -89,36 +84,10 @@ print('\nMerged dataset saved as cleaned_merged_sarcasm_dataset.csv')
 merged_data['cleaned_headline'] = merged_data['headline'].apply(clean_text)
 merged_data['lemmatized_headline'] = merged_data['cleaned_headline'].apply(lemmatize_text)
 
-# Feature Engineering
-def word_count(text):
-    return len(text.split())
-
-def char_count(text):
-    return len(text)
-
-def punctuation_count(text):
-    return len([char for char in text if char in string.punctuation])
-
-merged_data['word_count'] = merged_data['headline'].apply(word_count)
-merged_data['char_count'] = merged_data['headline'].apply(char_count)
-merged_data['punctuation_count'] = merged_data['headline'].apply(punctuation_count)
-
 # Text Length Analysis
 merged_data['headline_length'] = merged_data['headline'].apply(len)
 sns.boxplot(x='is_sarcastic', y='headline_length', data=merged_data)
 plt.title('Distribution of Headline Lengths by Sarcasm Label')
-plt.show()
-
-# Exclamation and Question Marks Analysis
-merged_data['exclamation_mark'] = merged_data['headline'].apply(lambda x: x.count('!'))
-merged_data['question_mark'] = merged_data['headline'].apply(lambda x: x.count('?'))
-
-sns.countplot(x='exclamation_mark', hue='is_sarcastic', data=merged_data)
-plt.title('Distribution of Exclamation Marks in Headlines')
-plt.show()
-
-sns.countplot(x='question_mark', hue='is_sarcastic', data=merged_data)
-plt.title('Distribution of Question Marks in Headlines')
 plt.show()
 
 # Correcting Top Unigrams in Headlines
@@ -152,60 +121,10 @@ merged_data['sentiment_polarity'] = merged_data['headline'].apply(calculate_sent
 sns.boxplot(x='is_sarcastic', y='sentiment_polarity', data=merged_data)
 plt.title('Sentiment Polarity Distribution by Sarcasm Label')
 plt.show()
-
-# Define function to calculate multiple punctuation count
-def count_multiple_punctuation(text):
-    return len(re.findall(r'[\?!.]{2,}', text))
-
-# Apply the function to count multiple punctuations
-merged_data['multiple_punct_count'] = merged_data['headline'].apply(count_multiple_punctuation)
-
-# Visualize the distribution of multiple consecutive punctuations
-sns.countplot(x='multiple_punct_count', hue='is_sarcastic', data=merged_data)
-plt.title('Distribution of Multiple Consecutive Punctuation Marks in Headlines')
-plt.show()
-
-# Define function to flag large numbers
-def contains_large_number(text):
-    return int(bool(re.search(r'\b\d{5,}\b', text)))
-
-# Apply the function to flag large numbers
-merged_data['large_number_flag'] = merged_data['headline'].apply(contains_large_number)
-
-# Visualize the presence of large numbers in headlines
-sns.countplot(x='large_number_flag', hue='is_sarcastic', data=merged_data)
-plt.title('Presence of Large Numbers in Headlines')
-plt.show()
-
-# Define function to calculate all caps words count
-def count_all_caps(text):
-    return sum(word.isupper() for word in text.split() if len(word) > 1)
-
-# Apply the function to count all caps words
-merged_data['all_caps_count'] = merged_data['headline'].apply(count_all_caps)
-
-# Visualize the use of all caps words
-sns.boxplot(x='is_sarcastic', y='all_caps_count', data=merged_data)
-plt.title('All Caps Word Count Distribution by Sarcasm Label')
-plt.show()
-
-# Define function to calculate punctuation count
-def calculate_punctuation_count(text):
-    return len(re.findall(r'[^\w\s]', text))
-
-# Apply the function to calculate punctuation count
-merged_data['punctuation_count'] = merged_data['headline'].apply(calculate_punctuation_count)
-
-# Visualize the punctuation count distribution
-sns.boxplot(x='is_sarcastic', y='punctuation_count', data=merged_data)
-plt.title('Punctuation Count Distribution by Sarcasm Label')
-plt.show()
-
 # Tokenize and remove stop words from each headline
 merged_data['filtered_tokens'] = merged_data['headline'].apply(
     lambda x: [word.lower() for word in word_tokenize(x) if word.isalpha() and word.lower() not in stop_words]
 )
-
 # Top Words Analysis
 def plot_top_words(filtered_tokens_series, title):
     all_words = [word for tokens in filtered_tokens_series for word in tokens]
@@ -246,18 +165,9 @@ plt.figure(figsize=(10, 5))
 plt.imshow(wordcloud, interpolation='bilinear')
 plt.axis('off')
 plt.show()
-
 # Save the enhanced dataset with new features
 merged_data.to_csv('enhanced_sarcasm_dataset.csv', index=False)
 print('\nEnhanced dataset saved as enhanced_sarcasm_dataset.csv')
-
-# ##Before adding Preprocessing steps
-# # TF-IDF Vectorization
-# tfidf_vectorizer = TfidfVectorizer(max_features=5000)
-# X_tfidf = tfidf_vectorizer.fit_transform(merged_data['headline']).toarray()
-# # Word2Vec Model Training
-# word2vec_model = Word2Vec(merged_data['filtered_tokens'], vector_size=100, window=5, min_count=2, workers=4)
-
 
 ##After adding preprocessing steps:
 # TF-IDF Vectorization using lemmatized text
@@ -273,7 +183,6 @@ X_train, X_test, y_train, y_test = train_test_split(
     test_size=0.2,
     random_state=42
 )
-
 ##Baseline Models
 #1LogisticRegression
 from sklearn.linear_model import LogisticRegression
@@ -298,43 +207,6 @@ y_pred_nb = nb_model.predict(X_test)
 # Calculate accuracy
 accuracy_nb = accuracy_score(y_test, y_pred_nb)
 print(f"Naive Bayes Accuracy: {accuracy_nb}")
-
-#SVM
-from sklearn.svm import SVC
-# Initialize the model
-svm_model = SVC()
-# Train the model
-svm_model.fit(X_train, y_train)
-# Predict on the test set
-y_pred_svm = svm_model.predict(X_test)
-# Calculate accuracy
-accuracy_svm = accuracy_score(y_test, y_pred_svm)
-print(f"SVM Accuracy: {accuracy_svm}")
-
-##Ensemble Models
-#1RandomForest
-from sklearn.ensemble import RandomForestClassifier
-# Initialize the model
-rf_model = RandomForestClassifier()
-# Train the model
-rf_model.fit(X_train, y_train)
-# Predict on the test set
-y_pred_rf = rf_model.predict(X_test)
-# Calculate accuracy
-accuracy_rf = accuracy_score(y_test, y_pred_rf)
-print(f"Random Forest Accuracy: {accuracy_rf}")
-
-#2GradientBoosting
-from sklearn.ensemble import GradientBoostingClassifier
-# Initialize the model
-gb_model = GradientBoostingClassifier()
-# Train the model
-gb_model.fit(X_train, y_train)
-# Predict on the test set
-y_pred_gb = gb_model.predict(X_test)
-# Calculate accuracy
-accuracy_gb = accuracy_score(y_test, y_pred_gb)
-print(f"Gradient Boosting Accuracy: {accuracy_gb}")
 
 ##Deep Learning Approaches
 # #1LSTM (Long Short-Term Memory networks):
@@ -408,10 +280,7 @@ def plot_graphs(history, metric):
 plot_graphs(history, 'accuracy')
 plot_graphs(history, 'loss')
 
-
-
 from keras.layers import Conv1D, GlobalMaxPooling1D, Dropout
-
 # CNN Model
 model_cnn = Sequential([
     Embedding(vocab_size, 32, input_length=max_length),
@@ -443,8 +312,6 @@ y_pred_cnn = model_cnn.predict(X_test).round()
 print(classification_report(y_test, y_pred_cnn))
 print(confusion_matrix(y_test, y_pred_cnn))
 
-
-
 # Tranformer
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -463,8 +330,6 @@ train_texts, val_texts, train_labels, val_labels = train_test_split(
     test_size=0.1,  # You can adjust the test size
     random_state=42
 )
-
-
 
 #Creating a Custom Dataset Class:
 class SarcasmDataset(Dataset):
@@ -505,7 +370,6 @@ val_dataset = SarcasmDataset(val_texts, val_labels, tokenizer, max_token_len=128
 # Creating DataLoaders
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)  # Set shuffle to False for validation set
-
 
 #BERT model architecture for classification.
 from transformers import BertForSequenceClassification, AdamW, BertConfig
@@ -603,9 +467,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-
 # Assuming your dataloaders (train_loader and val_loader) are already defined and loaded with the dataset
-
 # BERT + LSTM Model
 class BertLSTM(nn.Module):
     def __init__(self):
@@ -620,7 +482,6 @@ class BertLSTM(nn.Module):
         lstm_out, _ = self.lstm(sequence_output)
         out = self.fc(lstm_out[:, -1, :])
         return out
-
 
 # BERT + CNN Model
 class BertCNN(nn.Module):
@@ -641,7 +502,6 @@ class BertCNN(nn.Module):
         out = self.fc(pooled)
         return out
 
-
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -653,7 +513,6 @@ bert_cnn_model = BertCNN().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer_lstm = optim.Adam(bert_lstm_model.parameters(), lr=2e-5)
 optimizer_cnn = optim.Adam(bert_cnn_model.parameters(), lr=2e-5)
-
 
 # Training function
 def train_model(model, train_loader, optimizer, criterion, epochs, device):
@@ -674,7 +533,6 @@ def train_model(model, train_loader, optimizer, criterion, epochs, device):
 
         avg_loss = total_loss / len(train_loader)
         print(f'Epoch {epoch + 1}/{epochs}, Loss: {avg_loss:.4f}')
-
 
 # Evaluation function
 def evaluate_model(model, val_loader, device):
@@ -697,7 +555,6 @@ def evaluate_model(model, val_loader, device):
     precision, recall, f1, _ = precision_recall_fscore_support(all_true_labels, all_predictions, average='binary')
     return accuracy, precision, recall, f1
 
-
 # Training BERT + LSTM
 print("Training BERT + LSTM...")
 train_model(bert_lstm_model, train_loader, optimizer_lstm, criterion, epochs=5, device=device)
@@ -714,3 +571,179 @@ print(
 # Evaluating BERT + CNN
 accuracy_cnn, precision_cnn, recall_cnn, f1_cnn = evaluate_model(bert_cnn_model, val_loader, device)
 print(f"BERT + CNN - Accuracy: {accuracy_cnn}, Precision: {precision_cnn}, Recall: {recall_cnn}, F1 Score: {f1_cnn}")
+
+##########################   App.py #########################################
+import numpy as np
+import streamlit as st
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, f1_score, classification_report
+import lime
+from lime.lime_text import LimeTextExplainer
+import nltk
+from sklearn.pipeline import make_pipeline
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+import pickle
+from transformers import pipeline
+
+# Ensure the necessary NLTK downloads
+nltk.download('stopwords')
+nltk.download('wordnet')
+
+
+# Function to process text data
+def process_text(data):
+    lemma = nltk.WordNetLemmatizer()
+    stopwords_set = set(stopwords.words('english'))
+    processed_data = []
+    for sent in data:
+        words = [lemma.lemmatize(word) for word in sent.split() if word.lower() not in stopwords_set]
+        processed_data.append(' '.join(words))
+    return processed_data
+
+
+# Function to evaluate the model and return metrics
+def evaluate_model(clf, X_train, y_train, X_test, y_test):
+    y_train_pred = clf.predict(X_train)
+    y_test_pred = clf.predict(X_test)
+    train_accuracy = accuracy_score(y_train, y_train_pred)
+    test_accuracy = accuracy_score(y_test, y_test_pred)
+    train_f1 = f1_score(y_train, y_train_pred)
+    test_f1 = f1_score(y_test, y_test_pred)
+    report = classification_report(y_test, y_test_pred)
+    return train_accuracy, train_f1, test_accuracy, test_f1, report
+
+
+# Function for text summarization
+def text_summarization(text):
+    saved_model = "t5-sarcastic-headline-generator"
+    summarizer = pipeline("summarization", model=saved_model)
+    summarized_text = summarizer(text, min_length=10, max_length=30)[0]['summary_text']
+    return summarized_text
+
+
+# Function for sarcasm prediction
+def predict_sarcasm(text, clf, tfidf):
+    processed_text = process_text([text])
+    tfidf_text = tfidf.transform(processed_text)
+    prediction = clf.predict(tfidf_text)
+    return "Sarcastic" if prediction[0] == 1 else "Non Sarcastic"
+
+
+# Main function for the Streamlit app
+def main():
+    st.title("Sarcasm Detection in Headlines")
+
+    # Project Overview
+    st.header("Project Overview")
+    st.write(
+        "This project aims to detect sarcasm in news headlines using machine learning. It's an exploration into natural language processing and sentiment analysis.")
+
+    # Sidebar with Project Info
+    st.sidebar.header("Project Information")
+    st.sidebar.markdown("""
+        - **Project Title:** Sarcasm Detection Project
+        - **Presented By Group 6:**  
+            Shikha Sharma<br>
+            Purvi Jain<br>
+            Tanmay Kshirsagar
+        - **Instructor:** Amir Jafari
+        - **Completion Time:** 1 months
+    """, unsafe_allow_html=True)
+
+    # Dataset Display
+    st.header("Dataset Exploration")
+    uploaded_file = st.file_uploader("Upload your dataset (JSON format)", type=["json"])
+    if uploaded_file is not None:
+        df = pd.read_json(uploaded_file, lines=True)
+        if st.checkbox("Show dataset head"):
+            st.dataframe(df.head())
+
+        # Data Analysis
+        st.subheader("Data Analysis and Visualization")
+        if st.checkbox("Show data analysis"):
+            st.subheader("Sarcasm Count in Dataset")
+            sarcasm_count = df['is_sarcastic'].value_counts()
+            st.bar_chart(sarcasm_count)
+            st.subheader("Top Words in Sarcastic vs Non-Sarcastic Headlines")
+            st.image("img.png", caption="Top Words in Sarcastic Headlines")
+            st.image("img_1.png", caption="Top Words in Non-Sarcastic Headlines")
+
+            # Average Word Length Visualization
+            st.subheader("Average Word Length in Sarcastic vs Non-Sarcastic Text")
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+            word = df[df['is_sarcastic'] == 1]['headline'].str.split().apply(lambda x: [len(i) for i in x])
+            sns.distplot(word.map(lambda x: np.mean(x)), ax=ax1, color='red')
+            ax1.set_title('Sarcastic Text')
+            word = df[df['is_sarcastic'] == 0]['headline'].str.split().apply(lambda x: [len(i) for i in x])
+            sns.distplot(word.map(lambda x: np.mean(x)), ax=ax2, color='green')
+            ax2.set_title('Not Sarcastic Text')
+            fig.suptitle('Average Word Length in Each Text')
+            st.pyplot(fig)
+
+    # Model Training and Evaluation
+    st.header("Model Training and Evaluation")
+    if uploaded_file is not None:
+        model_option = st.selectbox("Choose your model",
+                                    ['Logistic Regression', 'Naive Bayes', 'LSTM', 'BERT', 'BertLSTM', 'BERTMLP',
+                                     'RoBERTa', 'Text Summarization'])
+
+        if model_option in ['LSTM', 'BERT', 'BertLSTM', 'BERTMLP', 'RoBERTa', 'Text Summarization']:
+            st.markdown("**Note:** Advanced models are demonstrated using pre-trained results.")
+
+            # Replace 'path_to_your_screenshot.png' with the actual path or URL to your screenshot
+            if model_option == 'BERT':
+                st.image("Picture1.png", caption="BERT Model Results")
+            elif model_option == 'LSTM':
+                st.image("lstm.png", caption="LSTM Model Results")
+            elif model_option == 'BertLSTM':
+                st.image("BERT+LSTM.png", caption="BERTLSTM Model Results")
+            elif model_option == 'BERTMLP':
+                st.image("BERT+MLP.png", caption="BERTMLP Model Results")
+            elif model_option == 'RoBERTa':
+                st.image("RoBerta.png", caption="RoBERTa Model Results")
+            elif model_option == 'Text Summarization':
+                st.image("summ_rouge_vs_epoch.png", caption="Text Summarization Model Results")
+        else:
+            tfidf = TfidfVectorizer()
+            if st.button("Train Model"):
+                processed_data = process_text(df['headline'])
+                labels = df['is_sarcastic']
+                X_train, X_test, y_train, y_test = train_test_split(processed_data, labels, test_size=0.2,
+                                                                    random_state=42)
+                X_train = tfidf.fit_transform(X_train)
+                X_test = tfidf.transform(X_test)
+
+                if model_option == 'Logistic Regression':
+                    clf = LogisticRegression(n_jobs=1, C=1e5)
+                elif model_option == 'Naive Bayes':
+                    clf = MultinomialNB()
+
+                clf.fit(X_train, y_train)
+                st.session_state['clf'] = clf  # Store the model in session state
+                st.session_state['tfidf'] = tfidf  # Store the TFIDF vectorizer in session state
+
+                train_accuracy, train_f1, test_accuracy, test_f1, report = evaluate_model(clf, X_train, y_train, X_test,
+                                                                                          y_test)
+
+                st.subheader("Model Performance Metrics:")
+                st.write(f"Train Accuracy: {train_accuracy}")
+                st.write(f"Test Accuracy: {test_accuracy}")
+                st.write(f"Train F1 Score: {train_f1}")
+                st.write(f"Test F1 Score: {test_f1}")
+                st.text("Classification Report:")
+                st.text(report)
+
+                # Save the model
+                filename = f'finalized_{model_option}_model.sav'
+                pickle.dump(clf, open(filename, 'wb'))
+                st.success(f"{model_option} model trained and saved successfully!")
+
+if __name__ == "__main__":
+    main()
